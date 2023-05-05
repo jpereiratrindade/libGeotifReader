@@ -1,5 +1,5 @@
 #include "GeotifReader.h"
-
+//!Start GeotifReader Class with the image data file name read only
 GeotifReader::GeotifReader(const char* filename)
 {
     int hasNoData = 0;
@@ -9,6 +9,8 @@ GeotifReader::GeotifReader(const char* filename)
     if (dataset == NULL)
     {
         // Error handling
+        std::cerr << "\n[ERROR]\tFailed to open dataset:\t" << filename << std::endl;
+        std::cerr << "[ERROR]\tError message:\t" << CPLGetLastErrorMsg() << std::endl;
     }
 
     this->width = this->dataset->GetRasterXSize();
@@ -25,51 +27,63 @@ GeotifReader::GeotifReader(const char* filename)
     CPLErr err = this->band->RasterIO(GF_Read, 0, 0, this->width, this->height, this->data, this->width, this->height, GDT_Float32, 0, 0);
     if (err != CE_None)
     {
-        std::cerr<< "\n[ERROR]\t" << CE_None << std::endl;
+        // Error handling
+        std::cerr << "\t[ERROR]\tFailed to read raster data from band." << std::endl;
+        std::cerr << "[ERROR]\tError message:\t" << CPLGetLastErrorMsg() << std::endl;
+        delete[] data; // Free the memory allocated for the raster data
+        GDALClose(dataset); // Close the dataset and release resources
     }
 }
 //****************************************************************************
+//!Empty float* data array and close dataset
 GeotifReader::~GeotifReader()
 {
     delete[] this->data;
     GDALClose(this->dataset);
 }
 //****************************************************************************
-float GeotifReader::GetValue(int x, int y)
+//!Return data value into x, y position
+float GeotifReader::ReturnXYValue(int x, int y)
 {
     return this->data[y * this->width + x];
 }
 //****************************************************************************
-int GeotifReader::GetWidth()
+//!Return image width (number of collumns)
+int GeotifReader::ReturnWidth()
 {
     return this->width;
 }
 //****************************************************************************
-int GeotifReader::GetHeight()
+//!Return image height (number of rows)
+int GeotifReader::ReturnHeight()
 {
     return this->height;
 }
 //****************************************************************************
-std::vector<double> GeotifReader::GetScale()
+//!Return Image Scale into a std::vector<double> pxScale with two registers
+std::vector<double> GeotifReader::ReturnScale()
 {
     pxScale.push_back(this->geotransform[1]);
     pxScale.push_back(this->geotransform[5]);
     return this->pxScale;
 }
 //****************************************************************************
+//!Return image band number
 int GeotifReader::GetBandNumber()
 {
     return dataset->GetRasterCount();
 }
 //****************************************************************************
+//!Return the image data set into a float* array
 float* GeotifReader::ReturnFloatDataVector()
 {
     return this->data;
 }
 //****************************************************************************
+//!Get and return all image data values for all data types
 std::vector<double> GeotifReader::getImageValues(int band)
 {
-    std::vector<double> imageValues(this->width * this->height); // Initialize the vector to store the entire image
+    std::vector<double> imageValues(this->width * this->height);
     PixelData pixelData;
 
     switch (this->dataType) {
@@ -108,6 +122,11 @@ std::vector<double> GeotifReader::getImageValues(int band)
     CPLErr err = poBand->RasterIO(GF_Read, 0, 0, this->width, this->height, pixelData.byteData, this->width, this->height, dataType, 0, 0);
     if (err != CE_None) {
         std::cerr << "\n[ERROR]\t" << CE_None << std::endl;
+        std::cerr << "\t[ERROR]\tFailed to read raster data from band." << std::endl;
+        std::cerr << "[ERROR]\tError message:\t" << CPLGetLastErrorMsg() << std::endl;
+        delete[] pixelData.byteData; // Free the memory allocated
+        GDALClose(dataset); // Close the dataset and release resources
+
     }
 
     // Fill the imageValues vector with the pixel values from the PixelData union
@@ -179,8 +198,26 @@ std::vector<double> GeotifReader::getImageValues(int band)
     return imageValues;
 }
 //******************************************************************************
+//!Retur image data type
 GDALDataType GeotifReader::ReturnDataType() const
 {
     return this->dataType;
 }
 //******************************************************************************
+//!Return band 1 no data value
+double GeotifReader::ReturnNoDataValue() const
+{
+    return this->noDataValue;
+}
+//******************************************************************************
+//!Return the image number of pixels without consider no data values
+int GeotifReader::ReturnNumPixels()
+{
+    int counter = 0;
+    for(size_t i=0;i<(this->width*this->height);i++){
+        if(data[i]!= this->noDataValue){
+            counter++;
+        }
+    }
+    return numPxWithoutNoDataValue = (this->width * this->height) - counter;
+}
